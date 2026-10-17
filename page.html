@@ -32,6 +32,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .top{position:sticky;top:0;z-index:20;background:rgba(11,17,25,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top,0px)}
 .top-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modebar{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mode{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex:1;min-width:220px;max-width:340px}
+.mode button{border:0;background:transparent;border-radius:9px;padding:7px 10px;font:700 .95rem var(--f-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:7px}
+.mode button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.mode .dotl{width:7px;height:7px;border-radius:50%;background:var(--good)}
+.hrs{display:flex;gap:4px}
+.hrs button{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 10px;font:600 .82rem var(--f-mono);color:var(--muted)}
+.hrs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.mtag{font:600 .62rem var(--f-body);text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:5px;background:var(--panel-2);color:var(--muted);margin-left:6px}
 .brand{font:700 1.45rem/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 .brand span{color:var(--accent)}
 .stat{flex:1;min-width:0;font:500 .74rem/1.3 var(--f-mono);color:var(--muted);display:flex;flex-direction:column}
@@ -195,6 +204,13 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   <div class="stat" id="stat"><span class="live off"><i></i>A carregar</span><span>&nbsp;</span></div>
   <button class="icon-btn" id="openSettings" aria-label="Ajustes"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
   <button class="icon-btn go" id="refresh" aria-label="Atualizar"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg></button>
+</div>
+<div class="modebar">
+  <div class="mode" role="radiogroup" aria-label="Tipo de jogos">
+    <button data-m="live" role="radio" aria-checked="true"><span class="dotl"></span>Ao vivo</button>
+    <button data-m="pre" role="radio" aria-checked="false">Pré-jogo</button>
+  </div>
+  <div class="hrs" id="hrs" hidden><button data-h="6" aria-pressed="false">6 h</button><button data-h="24" aria-pressed="true">24 h</button><button data-h="48" aria-pressed="false">48 h</button></div>
 </div></header>
 
 <main>
@@ -232,14 +248,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <p><b>Stake.</b> É uma fração do critério de Kelly sobre a tua banca. Ajusta a banca e a fração em Ajustes.</p>
     <p><b>Avisos.</b> “Odd antiga” quer dizer que a casa não atualiza há mais de 60 s. “Confirmar” quer dizer EV acima de 25%, o que muitas vezes é um erro ou uma odd que já mudou. Confirma sempre a odd na casa antes de apostar.</p>
     <p><b>22bet.</b> Não está na fonte de dados. A 1xBet é do mesmo grupo e costuma ter as mesmas odds; usa-a como referência e confirma na 22bet.</p>
-    <p><b>Créditos.</b> Cada atualização gasta cerca de 15 créditos da The Odds API (500 por mês no plano grátis). Com menos de 40, a app só atualiza de 15 em 15 minutos.</p>
+    <p><b>Pré-jogo.</b> Mostra os jogos que começam nas próximas 6, 24 ou 48 horas. É onde a comparação com a Pinnacle funciona melhor: as odds mexem devagar e tens tempo para confirmar e apostar. Os dados guardam-se 10 minutos para poupar créditos.</p>
+    <p><b>Créditos.</b> Cada atualização gasta cerca de 15 créditos ao vivo e 20 a 30 no pré-jogo (500 por mês no plano grátis). Com menos de 40, a app só atualiza de 15 em 15 minutos.</p>
     <p><b>Registo.</b> As apostas que registas ficam guardadas só neste telemóvel/browser. Usa “Copiar para Excel” para as passares para a tua folha.</p>
   </section>
 </main>
 
 <nav class="tabbar" role="tablist"><div class="tabbar-in">
   <button class="tab" role="tab" data-v="opps" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Oportunidades<span class="badge" id="bOpps" hidden></span></button>
-  <button class="tab" role="tab" data-v="games" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Ao vivo<span class="badge" id="bGames" hidden></span></button>
+  <button class="tab" role="tab" data-v="games" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Jogos<span class="badge" id="bGames" hidden></span></button>
   <button class="tab" role="tab" data-v="bets" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Apostas</button>
   <button class="tab" role="tab" data-v="help" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14"/><path d="M12 17.5h0"/></svg>Ajuda</button>
 </div></nav>
@@ -312,7 +329,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 <script>
 var $=function(id){return document.getElementById(id)};
-var S={data:null,sport:"",view:"opps",timer:null,left:0,rows:[],pending:null,loading:false};
+var S={data:null,mode:ls("radar-mode")==="pre"?"pre":"live",hours:parseInt(ls("radar-hours")||"24",10)||24,sport:"",view:"opps",timer:null,left:0,rows:[],pending:null,loading:false};
 var SPORT={futebol:"Futebol",basquetebol:"Basquetebol",tenis:"Ténis"};
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
@@ -320,6 +337,14 @@ function num(id){var v=parseFloat(String($(id).value).replace(",","."));return i
 function eur(v){return (v<0?"−":"")+Math.abs(v).toFixed(2).replace(".",",")+" €"}
 function pct(v){return (v*100).toFixed(1).replace(".",",")+"%"}
 function odd(v){return v.toFixed(2).replace(".",",")}
+function when(start){
+  var t=Date.parse(start),diff=Math.round((t-Date.now())/60000);
+  if(diff<=0)return "há "+mins(start);
+  var d=new Date(t),today=new Date(),tm=new Date();tm.setDate(today.getDate()+1);
+  var hh=d.toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"});
+  var day=d.toDateString()===today.toDateString()?"hoje":d.toDateString()===tm.toDateString()?"amanhã":d.toLocaleDateString("pt-PT",{weekday:"short",day:"2-digit"});
+  return day+" "+hh+" · em "+(diff<60?diff+" min":Math.floor(diff/60)+"h"+String(diff%60).padStart(2,"0"));
+}
 function mins(start){var m=Math.max(0,Math.round((Date.now()-Date.parse(start))/60000));return m<60?m+" min":Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")}
 function toast(t){var el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true},1800)}
 
@@ -340,6 +365,14 @@ document.querySelectorAll("#autoSeg button").forEach(function(b){b.addEventListe
 ["bank","kf","minev","maxodd"].forEach(function(k){$(k).addEventListener("input",syncSettingsUI)});
 $("resetSet").addEventListener("click",function(){Object.keys(DEF).forEach(function(k){$(k).value=DEF[k];ls("radar-"+k,DEF[k])});ls("radar-book","onexbet");if(S.data)fillBooks();syncSettingsUI();schedule();render()});
 syncSettingsUI();
+function syncMode(){
+  document.querySelectorAll(".mode button").forEach(function(b){b.setAttribute("aria-checked",b.dataset.m===S.mode?"true":"false")});
+  $("hrs").hidden=S.mode!=="pre";
+  document.querySelectorAll("#hrs button").forEach(function(b){b.setAttribute("aria-pressed",+b.dataset.h===S.hours?"true":"false")});
+}
+document.querySelectorAll(".mode button").forEach(function(b){b.addEventListener("click",function(){if(S.mode===b.dataset.m)return;S.mode=b.dataset.m;ls("radar-mode",S.mode);syncMode();S.data=null;$("oppList").innerHTML='<div class="empty"><b>A carregar…</b></div>';load()})});
+document.querySelectorAll("#hrs button").forEach(function(b){b.addEventListener("click",function(){S.hours=+b.dataset.h;ls("radar-hours",String(S.hours));syncMode();load()})});
+syncMode();
 
 /* painéis */
 function openSheet(id){$("scrim").hidden=false;$(id).hidden=false}
@@ -363,7 +396,7 @@ $("code").addEventListener("keydown",function(e){if(e.key==="Enter")$("enter").c
 function load(){
   if(S.loading)return;S.loading=true;$("refresh").classList.add("spin");
   var demo=location.search.indexOf("demo=1")>=0;
-  fetch("/api/data"+(demo?"?demo=1":""),{headers:{"x-code":ls("radar-code")||""}}).then(function(r){
+  fetch("/api/data?mode="+S.mode+"&hours="+S.hours+(demo?"&demo=1":""),{headers:{"x-code":ls("radar-code")||""}}).then(function(r){
     if(r.status===401){$("app").hidden=true;$("gate").hidden=false;$("gateMsg").textContent=ls("radar-code")?"Código errado. Tenta outra vez.":"";throw null}
     return r.json().then(function(d){if(!r.ok)throw new Error(d.error||("Erro "+r.status));return d});
   }).then(function(d){$("gate").hidden=true;$("app").hidden=false;S.data=d;fillBooks();render();schedule()})
@@ -383,7 +416,7 @@ function fillBooks(){
 function statLine(){
   var d=S.data;if(!d){return}
   var t=new Date(d.updatedAt).toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"});
-  var l1=d.mode==="live"?'<span class="live"><i></i>Ao vivo · '+t+"</span>":'<span class="live off"><i></i>Exemplo · '+t+"</span>";
+  var lab=(d.view==="pre"?"Pré-jogo "+d.hours+"h":"Ao vivo");var l1=d.mode==="live"||d.mode==="pre"?'<span class="live'+(d.view==="pre"?" off":"")+'"><i></i>'+lab+" · "+t+"</span>":'<span class="live off"><i></i>Exemplo · '+lab+" · "+t+"</span>";
   var bits=[];
   if(d.quota&&d.quota.remaining!=null)bits.push("<b>"+d.quota.remaining+"</b> créditos");
   var s=parseInt($("auto").value,10);if(s&&S.left>0)bits.push("próx. "+S.left+"s");
@@ -425,7 +458,7 @@ function render(){
     $("hero").innerHTML='<span class="k">Melhor oportunidade agora</span><span class="v">'+esc(best.selection)+" @ "+odd(best.price)+'</span><span class="d">'+esc(best.match)+" · "+esc(best.book)+'</span><div class="row"><span class="chipx">EV +'+pct(best.ev)+'</span><span class="chipx">Stake '+eur(stakeFor(best,s))+'</span><span class="chipx">Justa '+odd(best.fairOdd)+"</span></div>";
   }else{
     $("hero").className="hero";
-    $("hero").innerHTML='<span class="k">Melhor oportunidade agora</span><span class="v">Nada acima de '+pct(s.thr)+'</span><span class="d">'+(nl?nl+" jogos ao vivo a ser vigiados.":"Sem jogos ao vivo nas competições seguidas.")+" Carrega em atualizar daqui a pouco.</span>";
+    $("hero").innerHTML='<span class="k">Melhor oportunidade agora</span><span class="v">Nada acima de '+pct(s.thr)+'</span><span class="d">'+(nl?nl+(S.mode==="pre"?" jogos nas próximas "+S.hours+" h.":" jogos ao vivo a ser vigiados."):(S.mode==="pre"?"Sem jogos nas próximas "+S.hours+" h.":"Sem jogos ao vivo nas competições seguidas."))+" Carrega em atualizar daqui a pouco.</span>";
   }
 
   /* lista agrupada por jogo */
@@ -434,9 +467,9 @@ function render(){
   var logged=bets().map(function(b){return b.key});
   $("oppList").innerHTML=groups.length?groups.map(function(g){
     var h=g.o;
-    return '<article class="game"><div class="g-head"><div class="g-teams"><div class="g-league"><span class="sp">'+SPORT[h.sport]+"</span>"+esc(h.league)+" · há "+mins(h.start)+'</div><div class="g-name">'+esc(h.match)+"</div></div>"+(h.score?'<div class="g-score">'+esc(h.score)+"</div>":"")+"</div>"+
+    return '<article class="game"><div class="g-head"><div class="g-teams"><div class="g-league"><span class="sp">'+SPORT[h.sport]+"</span>"+esc(h.league)+" · "+when(h.start)+'</div><div class="g-name">'+esc(h.match)+"</div></div>"+(h.score?'<div class="g-score">'+esc(h.score)+"</div>":"")+"</div>"+
       g.items.map(function(o){
-        var stale=o.ageSec>60||o.lagSec>45,warn=stale||o.suspect,st=stakeFor(o,s),key=o.eventId+"|"+o.selection+"|"+o.market,done=logged.indexOf(key)>=0;
+        var stale=S.mode==="pre"?(o.ageSec>1800||o.lagSec>900):(o.ageSec>60||o.lagSec>45),warn=stale||o.suspect,st=stakeFor(o,s),key=o.eventId+"|"+o.selection+"|"+o.market,done=logged.indexOf(key)>=0;
         return '<div class="opp"><div class="o-main"><div class="o-sel">'+esc(o.selection)+'</div><div class="o-mk">'+esc(o.market)+" · "+esc(o.book)+"</div></div>"+
           '<div class="o-odd"><b>'+odd(o.price)+"</b><small>justa "+odd(o.fairOdd)+"</small></div>"+
           '<div class="ev'+(warn?" warn":"")+'">+'+pct(o.ev)+"</div>"+
@@ -444,15 +477,15 @@ function render(){
           (o.suspect?'<span class="tag">Confirmar</span>':"")+(stale?'<span class="tag">Odd antiga</span>':"")+
           '<button class="bet'+(done?" done":"")+'" data-i="'+o._i+'">'+(done?"Registada":"Apostei")+"</button></div></div>";
       }).join("")+"</article>";
-  }).join(""):'<div class="empty"><b>'+(nl?"Sem valor neste momento":"Sem jogos ao vivo")+"</b>"+(nl?"Nenhuma odd passa o EV mínimo com os filtros atuais. Baixa o EV mínimo ou escolhe todas as casas em Ajustes.":"Quando começarem jogos nas competições seguidas, aparecem aqui.")+"</div>";
+  }).join(""):'<div class="empty"><b>'+(nl?"Sem valor neste momento":(S.mode==="pre"?"Sem jogos neste período":"Sem jogos ao vivo"))+"</b>"+(nl?"Nenhuma odd passa o EV mínimo com os filtros atuais. Baixa o EV mínimo ou escolhe todas as casas em Ajustes.":(S.mode==="pre"?"Experimenta 48 h.":"Quando começarem jogos nas competições seguidas, aparecem aqui. Vê o Pré-jogo entretanto."))+"</div>";
   document.querySelectorAll(".bet").forEach(function(b){b.addEventListener("click",function(){openBet(S.rows[+b.dataset.i])})});
 
   /* jogos */
   var games=(d.live||[]);
   $("gameList").innerHTML=games.length?games.map(function(g){
     var n=(d.opps||[]).filter(function(o){return o.eventId===g.id&&o.ev>=s.thr&&o.price<=s.max}).length;
-    return '<div class="gcard"><div class="g-league"><span class="sp">'+SPORT[g.sport]+"</span>"+esc(g.league)+'</div><div class="t">'+esc(g.home)+'</div><div class="t">'+esc(g.away)+"</div>"+(g.score?'<div class="sc">'+esc(g.score)+"</div>":"")+'<div class="m">há '+mins(g.start)+" · "+g.books+" casas · "+(n?"<b class=pos>"+n+" com valor</b>":"sem valor")+"</div></div>";
-  }).join(""):'<div class="empty"><b>Sem jogos ao vivo</b>Futebol (principais ligas), NBA, Euroliga e ténis ATP/WTA.</div>';
+    return '<div class="gcard"><div class="g-league"><span class="sp">'+SPORT[g.sport]+"</span>"+esc(g.league)+'</div><div class="t">'+esc(g.home)+'</div><div class="t">'+esc(g.away)+"</div>"+(g.score?'<div class="sc">'+esc(g.score)+"</div>":"")+'<div class="m">'+when(g.start)+" · "+g.books+" casas · "+(n?"<b class=pos>"+n+" com valor</b>":"sem valor")+"</div></div>";
+  }).join(""):'<div class="empty"><b>'+(S.mode==="pre"?"Sem jogos neste período":"Sem jogos ao vivo")+'</b>Futebol (principais ligas), NBA, Euroliga e ténis ATP/WTA.</div>';
 
   renderBets();
 }
@@ -466,7 +499,7 @@ function openBet(o){
 }
 $("betSave").addEventListener("click",function(){
   var o=S.pending;if(!o)return;var b=bets();
-  b.unshift({id:Date.now(),t:new Date().toISOString(),key:o.eventId+"|"+o.selection+"|"+o.market,match:o.match,league:o.league,sel:o.selection,market:o.market,book:$("betBook").value||o.book,odd:num("betOdd"),stake:num("betStake"),fair:o.fairOdd,ev:o.ev,status:"pend"});
+  b.unshift({id:Date.now(),t:new Date().toISOString(),key:o.eventId+"|"+o.selection+"|"+o.market,match:o.match,league:o.league,sel:o.selection,market:o.market,book:$("betBook").value||o.book,odd:num("betOdd"),stake:num("betStake"),fair:o.fairOdd,ev:o.ev,mode:S.mode,status:"pend"});
   saveBets(b);closeSheets();toast("Aposta registada");render();
 });
 function profit(b){return b.status==="w"?b.stake*(b.odd-1):b.status==="l"?-b.stake:0}
@@ -479,7 +512,7 @@ function renderBets(){
   $("betList").innerHTML=b.length?b.map(function(x){
     var dt=new Date(x.t).toLocaleString("pt-PT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
     var p=profit(x);
-    return '<div class="bitem"><div class="b-top"><div class="l"><div class="o-sel">'+esc(x.sel)+'</div><div class="o-mk">'+esc(x.match)+" · "+esc(x.market)+"</div><div class=o-mk>"+dt+" · "+esc(x.book)+" · EV +"+pct(x.ev)+'</div></div><div class="r">'+odd(x.odd)+"<br><span class=o-mk>"+eur(x.stake)+"</span>"+(x.status!=="pend"?'<br><span class="'+(p>=0?"pos":"neg")+'">'+(p>0?"+":"")+eur(p)+"</span>":"")+"</div></div>"+
+    return '<div class="bitem"><div class="b-top"><div class="l"><div class="o-sel">'+esc(x.sel)+'</div><div class="o-mk">'+esc(x.match)+" · "+esc(x.market)+"</div><div class=o-mk>"+dt+" · "+esc(x.book)+" · EV +"+pct(x.ev)+'<span class="mtag">'+(x.mode==="pre"?"Pré":"Live")+"</span>"+'</div></div><div class="r">'+odd(x.odd)+"<br><span class=o-mk>"+eur(x.stake)+"</span>"+(x.status!=="pend"?'<br><span class="'+(p>=0?"pos":"neg")+'">'+(p>0?"+":"")+eur(p)+"</span>":"")+"</div></div>"+
       '<div class="b-acts"><button class="seg w'+(x.status==="w"?" on":"")+'" data-id="'+x.id+'" data-st="w">Ganhou</button><button class="seg l'+(x.status==="l"?" on":"")+'" data-id="'+x.id+'" data-st="l">Perdeu</button><button class="seg v'+(x.status==="v"?" on":"")+'" data-id="'+x.id+'" data-st="v">Anulada</button><button class="seg del" data-id="'+x.id+'" data-st="x" aria-label="Apagar">Apagar</button></div></div>';
   }).join(""):'<div class="empty"><b>Ainda sem apostas</b>Carrega em “Apostei” numa oportunidade para a registar aqui e acompanhar o lucro e o ROI.</div>';
   document.querySelectorAll(".seg").forEach(function(btn){btn.addEventListener("click",function(){

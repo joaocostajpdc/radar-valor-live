@@ -149,64 +149,80 @@ export function analyze(ev: Ev, now = Date.now()) {
 }
 
 // ---------- recolha ----------
-let cache: { t: number; data: any } | null = null;
-let pending: Promise<any> | null = null;
+// mode "live": jogos a decorrer · mode "pre": jogos que começam nas próximas `hours` horas
+const PRE_CACHE_MS = Math.max(60, Number(Bun.env.PRE_CACHE_SECONDS || 600)) * 1000;
+const cache = new Map<string, { t: number; data: any }>();
+const pending = new Map<string, Promise<any>>();
+const iso = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
 
-async function collect() {
+async function collect(mode: "live" | "pre", hours: number) {
   const now = Date.now();
+  const until = now + hours * 3600 * 1000;
+  const inWindow = (e: Ev) => {
+    const t = Date.parse(e.commence_time);
+    return mode === "live" ? t <= now && now - t < LIVE_WINDOW_MS : t > now && t <= until;
+  };
   const sports = await trackedSports();
   const evLists = await Promise.all(sports.map(async (s) => {
     try {
       const { data } = await api("/sports/" + s.key + "/events"); // não gasta créditos
-      return { s, live: (data as Ev[]).filter((e) => { const t = Date.parse(e.commence_time); return t <= now && now - t < LIVE_WINDOW_MS; }) };
-    } catch { return { s, live: [] as Ev[] }; }
+      return { s, evs: (data as Ev[]).filter(inWindow) };
+    } catch { return { s, evs: [] as Ev[] }; }
   }));
-  const liveSports = evLists.filter((x) => x.live.length);
+  const active = evLists.filter((x) => x.evs.length);
   let cost = 0;
   const errors: string[] = [];
   const opps: any[] = [];
-  const live: any[] = [];
+  const events: any[] = [];
   const books = new Map<string, string>();
-  await Promise.all(liveSports.map(async ({ s, live: evs }) => {
-    const liveIds = new Set(evs.map((e) => e.id));
+  await Promise.all(active.map(async ({ s, evs }) => {
+    const ids = new Set(evs.map((e) => e.id));
     try {
+      const params: Record<string, string> = { regions: REGIONS, markets: marketsFor(s.key), oddsFormat: "decimal" };
+      if (mode === "pre") { params.commenceTimeFrom = iso(now); params.commenceTimeTo = iso(until); }
+      const wantScores = mode === "live" && SHOW_SCORES && sportKind(s.key) !== "tenis";
       const [odds, scores] = await Promise.all([
-        api("/sports/" + s.key + "/odds", { regions: REGIONS, markets: marketsFor(s.key), oddsFormat: "decimal" }),
-        SHOW_SCORES && sportKind(s.key) !== "tenis" ? api("/sports/" + s.key + "/scores").catch(() => ({ data: [], cost: 0 })) : Promise.resolve({ data: [], cost: 0 }),
+        api("/sports/" + s.key + "/odds", params),
+        wantScores ? api("/sports/" + s.key + "/scores").catch(() => ({ data: [], cost: 0 })) : Promise.resolve({ data: [], cost: 0 }),
       ]);
       cost += odds.cost + scores.cost;
       const sc = new Map<string, any>();
       for (const e of scores.data as any[]) if (e.scores) sc.set(e.id, e.scores);
       for (const e of odds.data as Ev[]) {
-        if (!liveIds.has(e.id)) continue;
+        if (!ids.has(e.id)) continue;
         for (const b of e.bookmakers || []) books.set(b.key, b.title);
         const s2 = sc.get(e.id);
         const score = s2 ? [e.home_team, e.away_team].map((n) => s2.find((x: any) => x.name === n)?.score ?? "–").join("–") : null;
-        live.push({ id: e.id, sport: sportKind(e.sport_key), league: e.sport_title, home: e.home_team, away: e.away_team, start: e.commence_time, score, books: (e.bookmakers || []).length });
+        events.push({ id: e.id, sport: sportKind(e.sport_key), league: e.sport_title, home: e.home_team, away: e.away_team, start: e.commence_time, score, books: (e.bookmakers || []).length });
         for (const o of analyze(e, now)) opps.push({ ...o, score });
       }
     } catch (err: any) { errors.push(s.title + ": " + err.message); }
   }));
   opps.sort((a, b) => b.ev - a.ev);
+  events.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   return {
-    mode: "live", updatedAt: new Date().toISOString(), quota, cost, regions: REGIONS,
-    trackedCount: sports.length, live, opps, books: [...books].map(([key, title]) => ({ key, title })).sort((a, b) => a.title.localeCompare(b.title)), errors,
+    mode, view: mode, hours, updatedAt: new Date().toISOString(), quota, cost, regions: REGIONS,
+    trackedCount: sports.length, live: events, opps, books: [...books].map(([key, title]) => ({ key, title })).sort((a, b) => a.title.localeCompare(b.title)), errors,
   };
 }
 
-async function getData() {
-  if (cache && Date.now() - cache.t < CACHE_MS) return cache.data;
+async function getData(mode: "live" | "pre", hours: number) {
+  const key = mode + ":" + hours;
+  const ttl = mode === "pre" ? PRE_CACHE_MS : CACHE_MS;
+  const c = cache.get(key);
+  if (c && Date.now() - c.t < ttl) return c.data;
   // proteção de créditos: com poucos créditos, só atualiza de 15 em 15 minutos
-  if (cache && quota.remaining !== null && quota.remaining < 40 && Date.now() - cache.t < 15 * 60 * 1000) return { ...cache.data, lowQuota: true };
-  if (!pending) pending = collect().then((d) => { cache = { t: Date.now(), data: d }; return d; }).finally(() => { pending = null; });
-  return pending;
+  if (c && quota.remaining !== null && quota.remaining < 40 && Date.now() - c.t < 15 * 60 * 1000) return { ...c.data, lowQuota: true };
+  if (!pending.has(key)) pending.set(key, collect(mode, hours).then((d) => { cache.set(key, { t: Date.now(), data: d }); return d; }).finally(() => { pending.delete(key); }));
+  return pending.get(key)!;
 }
 
 // ---------- dados de exemplo ----------
-function demo() {
+function demo(view: "live" | "pre" = "live") {
   const now = Date.now();
+  const sign = view === "pre" ? -1 : 1;
   const mk = (id: string, sport_key: string, sport_title: string, mins: number, home: string, away: string, bms: [string, string, Market[]][]): Ev => ({
-    id, sport_key, sport_title, commence_time: new Date(now - mins * 60000).toISOString(), home_team: home, away_team: away,
+    id, sport_key, sport_title, commence_time: new Date(now - sign * mins * 60000).toISOString(), home_team: home, away_team: away,
     bookmakers: bms.map(([key, title, markets]) => ({ key, title, markets: markets.map((m) => ({ ...m, last_update: new Date(now - 15000).toISOString() })) })),
   });
   const h2h3 = (a: number, d: number, b: number, H: string, A: string): Market => ({ key: "h2h", outcomes: [{ name: H, price: a }, { name: "Draw", price: d }, { name: A, price: b }] });
@@ -229,12 +245,12 @@ function demo() {
       ["sport888", "888sport", [h2h2(1.44, 2.80, "Jogador A", "Jogador B")]],
     ]),
   ];
-  const scores: Record<string, string | null> = { d1: "1–1", d2: "48–44", d3: null };
+  const scores: Record<string, string | null> = view === "pre" ? { d1: null, d2: null, d3: null } : { d1: "1–1", d2: "48–44", d3: null };
   const opps = evs.flatMap((e) => analyze(e, now).map((o) => ({ ...o, score: scores[e.id] }))).sort((a, b) => b.ev - a.ev);
   const books = new Map<string, string>();
   evs.forEach((e) => e.bookmakers!.forEach((b) => books.set(b.key, b.title)));
   return {
-    mode: KEY ? "demo" : "nokey", updatedAt: new Date().toISOString(), quota, cost: 0, regions: REGIONS, trackedCount: 0,
+    mode: KEY ? "demo" : "nokey", view, hours: 24, updatedAt: new Date().toISOString(), quota, cost: 0, regions: REGIONS, trackedCount: 0,
     live: evs.map((e) => ({ id: e.id, sport: sportKind(e.sport_key), league: e.sport_title, home: e.home_team, away: e.away_team, start: e.commence_time, score: scores[e.id], books: e.bookmakers!.length })),
     opps, books: [...books].map(([key, title]) => ({ key, title })), errors: [],
   };
@@ -252,8 +268,10 @@ Bun.serve({
     if (url.pathname === "/api/data") {
       const code = req.headers.get("x-code") || url.searchParams.get("code") || "";
       if (CODE && code !== CODE) return json({ error: "codigo" }, 401);
-      if (!KEY || url.searchParams.get("demo") === "1") return json(demo());
-      try { return json(await getData()); }
+      const view = url.searchParams.get("mode") === "pre" ? "pre" : "live";
+      const hours = [6, 24, 48].includes(Number(url.searchParams.get("hours"))) ? Number(url.searchParams.get("hours")) : 24;
+      if (!KEY || url.searchParams.get("demo") === "1") return json(demo(view));
+      try { return json(await getData(view, view === "pre" ? hours : 0)); }
       catch (e: any) { return json({ error: e.message, quota }, 502); }
     }
     if (url.pathname === "/health") return new Response("ok");
