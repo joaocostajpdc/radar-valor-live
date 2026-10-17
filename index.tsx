@@ -196,6 +196,8 @@ async function collect() {
 
 async function getData() {
   if (cache && Date.now() - cache.t < CACHE_MS) return cache.data;
+  // proteção de créditos: com poucos créditos, só atualiza de 15 em 15 minutos
+  if (cache && quota.remaining !== null && quota.remaining < 40 && Date.now() - cache.t < 15 * 60 * 1000) return { ...cache.data, lowQuota: true };
   if (!pending) pending = collect().then((d) => { cache = { t: Date.now(), data: d }; return d; }).finally(() => { pending = null; });
   return pending;
 }
@@ -353,7 +355,8 @@ tr:last-child td{border-bottom:0}
     <label class="f" for="minev">EV mínimo (%)<input id="minev" type="number" value="3" min="0" step="0.5"></label>
     <label class="f" for="kf">Kelly (%)<input id="kf" type="number" value="25" min="0" max="100" step="5"></label>
     <label class="f" for="book">Casa<select id="book"><option value="">Todas as casas</option></select></label>
-    <label class="f" for="auto">Auto<select id="auto"><option value="60">60 s</option><option value="120">2 min</option><option value="300">5 min</option><option value="0">Desligado</option></select></label>
+    <label class="f" for="maxodd">Odd máxima<input id="maxodd" type="number" value="10" min="1.1" step="0.5"></label>
+    <label class="f" for="auto">Auto<select id="auto"><option value="0">Desligado</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option></select></label>
     <button class="primary" id="refresh">Atualizar</button>
   </div>
 </header>
@@ -381,7 +384,7 @@ tr:last-child td{border-bottom:0}
 var $=function(id){return document.getElementById(id)};
 var state={data:null,sport:"",timer:null,left:0};
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
-["bank","minev","kf","auto"].forEach(function(k){var v=ls("radar-"+k);if(v!==null&&v!==undefined)$(k).value=v;$(k).addEventListener("input",function(){ls("radar-"+k,$(k).value);render()})});
+["bank","minev","kf","maxodd","auto"].forEach(function(k){var v=ls("radar-"+k);if(v!==null&&v!==undefined)$(k).value=v;$(k).addEventListener("input",function(){ls("radar-"+k,$(k).value);render()})});
 $("book").addEventListener("change",function(){ls("radar-book",$("book").value);render()});
 $("auto").addEventListener("change",function(){ls("radar-auto",$("auto").value);schedule()});
 document.querySelectorAll(".chip").forEach(function(b){b.addEventListener("click",function(){state.sport=b.dataset.s;document.querySelectorAll(".chip").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});render()})});
@@ -426,10 +429,11 @@ function render(){
   var d=state.data;if(!d)return;statusLine();
   if(d.mode==="nokey")showBanner("<b>Modo exemplo.</b> Os jogos e odds abaixo são inventados para mostrar como funciona. Falta a chave da The Odds API na variável <code>ODDS_API_KEY</code> do servidor.");
   else if(d.mode==="demo")showBanner("<b>Modo exemplo</b> (abriste com ?demo=1).");
+  else if(d.lowQuota)showBanner("<b>Poucos créditos na API.</b> Para os poupar, os dados só atualizam de 15 em 15 minutos.");
   else if(d.errors&&d.errors.length)showBanner("Algumas competições falharam: "+esc(d.errors.join(" · ")));
   else showBanner("");
   var bank=num("bank"),thr=num("minev")/100,kf=Math.min(1,Math.max(0,num("kf")/100)),book=$("book").value;
-  var rows=(d.opps||[]).filter(function(o){return o.ev>=thr&&(!state.sport||o.sport===state.sport)&&(!book||o.bookKey===book)});
+  var rows=(d.opps||[]).filter(function(o){return o.ev>=thr&&o.price<=(num("maxodd")||99)&&(!state.sport||o.sport===state.sport)&&(!book||o.bookKey===book)});
   var html=rows.map(function(o){
     var k=(o.price*o.prob-1)/(o.price-1),stake=Math.max(0,k)*kf*bank;
     var stale=o.ageSec>60||o.lagSec>45;
